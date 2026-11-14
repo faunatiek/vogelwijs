@@ -573,7 +573,7 @@ async function getMedia(s) {
   const m = MEDIA[s.id] || {};
   let photos = [], sounds = [];
   if (m.p) m.p.forEach(x => photos.push({ ...meta(x), src: x[0] }));
-  if (LOOK[s.id]) photos.push({ placeholder: true, src: birdSvg(s.id, false) });
+  if (LOOK[s.id] && !m.p) photos.push({ placeholder: true, src: birdSvg(s.id, false) });
   if (m.s) {
     sounds.push({ ...meta(m.s), src: m.s[0] });
   } else if (SONG[s.id]) sounds.push({ placeholder: true, src: songUrl(s.id, 0) });
