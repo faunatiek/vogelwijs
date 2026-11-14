@@ -91,6 +91,8 @@ button { font: 700 1rem var(--font-body); cursor: pointer; color: var(--ink); ba
 .startrow { display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; }
 .mixbtn { display: grid; gap: 2px; text-align: left; background: var(--paper); }
 .mixbtn span { font-family: var(--font-body); font-size: .8rem; font-weight: 600; text-transform: none; letter-spacing: 0; opacity: .75; }
+.earlier { display: flex; gap: 8px; align-items: center; margin: -4px 0 14px; cursor: pointer; }
+.earlier input { width: 18px; height: 18px; accent-color: var(--ink); margin: 0; }
 button:hover:not(:disabled) { box-shadow: none; transform: none; }
 .mp-opts button[aria-checked="false"]:hover { background: rgba(35, 47, 95, .08); }
 /* Wissel in de quiz */
@@ -701,6 +703,7 @@ function viewHome() {
     </a>
     <section>
       <div class="route-head"><h2>Het leerpad</h2><span class="small">● gekend &nbsp;◐ ontmoet</span></div>
+      <label class="earlier small"><input type="checkbox" id="earlier"${withEarlier ? " checked" : ""}> Ook vogels uit eerdere niveaus in een niveau-quiz</label>
       <ol class="index">
         ${LEVELS.map(l => {
           const sc = levelScore(l.n), pct = Math.round(sc.known / sc.total * 100);
@@ -721,6 +724,7 @@ function viewHome() {
     </section>`;
   document.getElementById("start").onclick = () => startSession();
   document.getElementById("mix").onclick = () => startSession("mix");
+  document.getElementById("earlier").onchange = e => { withEarlier = e.target.checked; store.set("vw:earlier:v1", withEarlier); };
   app.querySelectorAll("[data-snd]").forEach(b => b.onclick = () => { soundOn = b.dataset.snd === "1"; store.set("vw:sound:v2", soundOn); viewHome(); });
   app.querySelectorAll("[data-level]").forEach(b => b.onclick = () => startSession(+b.dataset.level));
   app.querySelectorAll("[data-open]").forEach(b => b.onclick = () => {
@@ -731,6 +735,8 @@ function viewHome() {
 
 // Sessie
 let session = null;
+let withEarlier = store.get("vw:earlier:v1", false);
+const inLevel = (s, level) => withEarlier ? s.level <= level && isOpen(s.level) : s.level === level;
 // Langere rondes: herhalingen, tot 4 nieuwe soorten, aangevuld tot 15 vragen
 const qMode = s => modesOf(s).length > 1 && Math.random() < .5 ? "geluid" : "foto";
 function buildQueue(level) {
@@ -738,12 +744,12 @@ function buildQueue(level) {
   const ROUND = 15, q = [], nq = () => q.filter(x => x.type === "q").length;
   const pool = level ? SPECIES.filter(s => s.level === level) : SPECIES.filter(s => isOpen(s.level));
   if (!level) dueCards().slice(0, 10).forEach(k => { const [id, mode] = k.split(":"); if (byId[id] && isOpen(byId[id].level)) q.push({ type: "q", id, mode }); });
-  if (level) dueCards().forEach(k => { const [id, mode] = k.split(":"); if (byId[id] && byId[id].level === level && nq() < 8) q.push({ type: "q", id, mode }); });
+  if (level) dueCards().forEach(k => { const [id, mode] = k.split(":"); if (byId[id] && inLevel(byId[id], level) && nq() < 8) q.push({ type: "q", id, mode }); });
   const fresh = pool.filter(s => !isSeen(s.id)).slice(0, pool.filter(s => isSeen(s.id)).length < 8 ? 7 : 4);
   fresh.forEach(s => { q.push({ type: "intro", id: s.id }); modesOf(s).forEach(m => q.push({ type: "q", id: s.id, mode: m })); });
   const used = new Set(q.map(x => x.id));
   let fill = shuffle(pool.filter(s => isSeen(s.id) && !used.has(s.id)));
-  if (nq() + fill.length < ROUND) fill = fill.concat(shuffle(SPECIES.filter(s => isSeen(s.id) && !used.has(s.id) && !fill.includes(s))));
+  if (nq() + fill.length < ROUND) fill = fill.concat(shuffle(SPECIES.filter(s => isSeen(s.id) && !used.has(s.id) && !fill.includes(s) && (!level || inLevel(s, level)))));
   for (const s of fill) { if (nq() >= ROUND) break; q.push({ type: "q", id: s.id, mode: qMode(s) }); }
   const intros = q.filter(x => x.type === "intro"), qs = shuffle(q.filter(x => x.type === "q"));
   return [...intros, ...qs];
@@ -771,7 +777,8 @@ app.addEventListener("click", e => {
 });
 const qsndHtml = () => `<button class="qsnd" id="qsnd" aria-pressed="${soundOn}" aria-label="${soundOn ? "Geluid staat aan, tik voor alleen foto's" : "Alleen foto's, tik om geluid aan te zetten"}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h4l5-4v14l-5-4H3z" fill="currentColor"/>${soundOn ? '<path d="M15.5 8.5a5 5 0 0 1 0 7M18 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round"/>' : '<path d="M15.5 9.5l5 5M20.5 9.5l-5 5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>'}</svg>${soundOn ? "Aan" : "Uit"}</button>`;
 function distractors(s) {
-  const pool = SPECIES.filter(x => x.id !== s.id && (isOpen(x.level) || x.level === s.level));
+  const lv = session && typeof session.level === "number" ? session.level : 0;
+  const pool = SPECIES.filter(x => x.id !== s.id && (lv ? inLevel(x, lv) || x.level === s.level : isOpen(x.level) || x.level === s.level));
   const same = shuffle(pool.filter(x => x.level === s.level)), other = shuffle(pool.filter(x => x.level !== s.level));
   return [...same, ...other].slice(0, 3);
 }
@@ -826,13 +833,13 @@ async function viewQuiz() {
     const nowUnl = unlockedLevel(); if (nowUnl > prevUnl) session.levelUp = nowUnl;
     if (!ok && !session.retried.has(cardKey(s.id, mode))) { session.retried.add(cardKey(s.id, mode)); session.queue.splice(Math.min(session.i + 4, session.queue.length), 0, { type: "q", id: s.id, mode }); }
     const chosen = byId[pickedId];
-    document.getElementById("fb").innerHTML = `<div class="feedback ${ok ? "" : "bad"}">
+    document.getElementById("fb").innerHTML = `<div style="margin:14px 0"><button class="primary big" id="next">Volgende</button></div>
+      <div class="feedback ${ok ? "" : "bad"}">
       <strong>${ok ? `Juist, een ${s.nl.toLowerCase()}.` : `Nee, dit is een ${s.nl.toLowerCase()}.`}</strong>
       ${!ok && chosen && LOOK[chosen.id] ? `<span class="small">De ${chosen.nl.toLowerCase()} herken je zo: ${chosen.tips[0].charAt(0).toLowerCase() + chosen.tips[0].slice(1)}</span>` : ""}
       <ul>${s.tips.map(t => `<li>${t}</li>`).join("")}</ul></div>
-      ${credit(asset)}
-      <div style="margin-top:14px"><button class="primary big" id="next">Volgende</button></div>`;
-    const nx = document.getElementById("next"); nx.focus();
+      ${credit(asset)}`;
+    const nx = document.getElementById("next"); nx.focus({ preventScroll: true });
     nx.onclick = () => { stopAudio(); if (session.levelUp) { const n = session.levelUp; session.levelUp = 0; celebrate(n, () => { session.i++; viewQuiz(); }); } else { session.i++; viewQuiz(); } };
   };
   app.querySelectorAll(".options button").forEach(btn => btn.onclick = () => answer(btn, btn.dataset.id));
