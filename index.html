@@ -82,6 +82,12 @@ button { font: 700 1rem var(--font-body); cursor: pointer; color: var(--ink); ba
 .openrow .primary { flex: none; }
 .dunno { justify-self: start; border: 0; background: none; padding: 4px 0; text-decoration: underline; text-underline-offset: 3px; font-weight: 600; }
 .dunno:hover:not(:disabled) { box-shadow: none; transform: none; }
+.swipe { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; }
+.swipe::-webkit-scrollbar { display: none; }
+.swipe img { flex: 0 0 100%; scroll-snap-align: start; }
+.dots { display: flex; gap: 10px; justify-content: center; padding-top: 10px; }
+.dots button { width: 12px; height: 12px; min-height: 0; padding: 0; border: 2px solid var(--ink); border-radius: 50%; background: transparent; box-shadow: none; }
+.dots button.on { background: var(--ink); }
 button:hover:not(:disabled) { box-shadow: none; transform: none; }
 .mp-opts button[aria-checked="false"]:hover { background: rgba(35, 47, 95, .08); }
 /* Wissel in de quiz */
@@ -503,6 +509,14 @@ function playerHtml(src, big) {
     <div class="pcontrols"><button class="playbtn" aria-label="Speel geluid af">▶</button><span class="small ptime">Tik om te luisteren</span></div>
     <audio preload="auto" src="${src}"></audio></div>`;
 }
+const swipeHtml = (list, alt, cred = true) => `<div class="media swipe-wrap"><div class="swipe">${list.map((p, i) => `<img src="${p.src}" alt="${alt}"${i ? ' loading="lazy"' : ""}>`).join("")}</div>${list.length > 1 ? `<div class="dots">${list.map((_, i) => `<button type="button" aria-label="Foto ${i + 1}"${i ? "" : ' class="on"'}></button>`).join("")}</div>` : ""}</div>${cred ? `<div class="swcred">${credit(list[0])}</div>` : ""}`;
+function wireSwipe(root, list) {
+  const el = root.querySelector(".swipe"); if (!el) return;
+  const dots = [...root.querySelectorAll(".dots button")], cred = root.querySelector(".swcred");
+  let cur = 0;
+  el.addEventListener("scroll", () => { const i = Math.round(el.scrollLeft / el.clientWidth); if (i === cur) return; cur = i; dots.forEach((d, j) => d.classList.toggle("on", j === i)); if (cred && list[i]) cred.innerHTML = credit(list[i]); }, { passive: true });
+  dots.forEach((d, i) => d.onclick = () => el.scrollTo({ left: i * el.clientWidth, behavior: "smooth" }));
+}
 function wirePlayers(root) {
   root.querySelectorAll(".player:not([data-wired])").forEach(el => {
     el.dataset.wired = "1";
@@ -768,14 +782,14 @@ async function viewQuiz() {
   catch { app.innerHTML = `<section class="notice">Kan de foto's en geluiden niet laden. Probeer het opnieuw.<div style="margin-top:10px"><button id="retry">Opnieuw proberen</button></div></section>`; document.getElementById("retry").onclick = viewQuiz; return; }
 
   if (item.type === "intro") {
-    const ph = m.photos[0], so = m.sounds[0];
+    const ph = m.photos[0], so = m.sounds[0], introPh = m.photos.filter(p => !p.placeholder).length ? m.photos.filter(p => !p.placeholder) : m.photos;
     app.innerHTML = `<section class="panel" style="--lv:${lvColor(s.level)}">${head}
       <div class="intro-name"><span class="label">Nieuwe soort · niveau ${s.level}</span><h1>${s.nl}</h1><i>${s.sci}</i></div>
-      ${ph ? `<div class="media"><img src="${ph.src}" alt="${s.nl}"></div>${credit(ph)}` : `<p class="small">Geen foto gevonden.</p>`}
+      ${ph ? swipeHtml(introPh, s.nl) : `<p class="small">Geen foto gevonden.</p>`}
       ${!soundOn ? "" : so ? playerHtml(so.src) : `<p class="small">Nog geen geluid voor deze soort.</p>`}
       <div class="feedback"><strong>Zo herken je hem</strong><ul>${s.tips.map(t => `<li>${t}</li>`).join("")}</ul><span class="small">Leefgebied: ${s.habitat}</span></div>
       <div><button class="primary big" id="next">Verder</button></div></section>`;
-    wirePlayers(app);
+    wirePlayers(app); wireSwipe(app, introPh);
     document.getElementById("next").onclick = () => { stopAudio(); session.i++; viewQuiz(); };
     return;
   }
@@ -784,16 +798,16 @@ async function viewQuiz() {
   if (mode === "geluid" && !m.sounds.length) mode = "foto";
   if (mode === "foto" && !m.photos.length) mode = m.sounds.length ? "geluid" : null;
   if (!mode) { session.i++; return viewQuiz(); }
-  const realPh = m.photos.filter(p => !p.placeholder), asset = pick(mode === "foto" ? (realPh.length ? realPh : m.photos) : m.sounds);
+  const realPh = m.photos.filter(p => !p.placeholder), quizPh = shuffle(realPh.length ? realPh : m.photos), asset = mode === "foto" ? quizPh[0] : pick(m.sounds);
   const opts = shuffle([s, ...distractors(s)]), openQ = ((progress[cardKey(s.id, mode)] || {}).box || 0) >= 2;
   app.innerHTML = `<section class="panel" style="--lv:${lvColor(s.level)}">${head}
     <div class="question">${mode === "foto" ? "Wie is dit?" : "Wie hoor je?"}</div>
     ${mode === "foto"
-      ? `<div class="media"><img src="${asset.src}" alt="Welke vogel is dit?"></div><p class="figcap"><span class="mono">Afb. ${session.i + 1}</span><span>${asset.placeholder ? "Tekening" : "Foto"}</span></p>`
+      ? `${swipeHtml(quizPh, "Welke vogel is dit?", false)}<p class="figcap"><span class="mono">Afb. ${session.i + 1}</span><span>${quizPh.length > 1 ? `Veeg voor ${quizPh.length} foto's` : asset.placeholder ? "Tekening" : "Foto"}</span></p>`
       : playerHtml(asset.src, true)}
     ${openQ ? openHtml() : `<div class="options">${opts.map((o, i) => `<button data-id="${o.id}"><kbd>${"abcd"[i]}</kbd>${o.nl}<span class="opt-latin">${o.sci}</span></button>`).join("")}</div>`}
     <div id="fb"></div></section>`;
-  wirePlayers(app);
+  wirePlayers(app); if (mode === "foto") wireSwipe(app, quizPh);
   const answer = (btn, pickedId) => {
     const ok = pickedId === s.id;
     app.querySelectorAll(".options button").forEach(b => { b.disabled = true; if (b.dataset.id === s.id) b.classList.add("right"); });
@@ -893,7 +907,8 @@ async function viewSoort(id) {
     <section class="panel"><h2>Geluiden</h2><div id="so" class="small">Laden…</div></section>`;
   try {
     const m = await getMedia(s);
-    document.getElementById("ph").outerHTML = m.photos.length ? `<div class="gallery">${m.photos.map(ph => `<figure><img src="${ph.src}" alt="${s.nl}" loading="lazy">${credit(ph)}</figure>`).join("")}</div>` : `<p class="small">Geen foto's gevonden.</p>`;
+    document.getElementById("ph").outerHTML = m.photos.length ? `<div id="phs">${swipeHtml(m.photos, s.nl)}</div>` : `<p class="small">Geen foto's gevonden.</p>`;
+    if (m.photos.length) wireSwipe(document.getElementById("phs"), m.photos);
     document.getElementById("so").outerHTML = m.sounds.length ? `<div class="sounds">${m.sounds.map(so => `<div>${playerHtml(so.src)}${credit(so)}</div>`).join("")}</div>` : `<p class="small">Nog geen geluid voor deze soort.</p>`;
     wirePlayers(app);
   } catch {
