@@ -88,6 +88,9 @@ button { font: 700 1rem var(--font-body); cursor: pointer; color: var(--ink); ba
 .dots { display: flex; gap: 10px; justify-content: center; padding-top: 10px; }
 .dots button { width: 12px; height: 12px; min-height: 0; padding: 0; border: 2px solid var(--ink); border-radius: 50%; background: transparent; box-shadow: none; }
 .dots button.on { background: var(--ink); }
+.startrow { display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; }
+.mixbtn { display: grid; gap: 2px; text-align: left; background: var(--paper); }
+.mixbtn span { font-family: var(--font-body); font-size: .8rem; font-weight: 600; text-transform: none; letter-spacing: 0; opacity: .75; }
 button:hover:not(:disabled) { box-shadow: none; transform: none; }
 .mp-opts button[aria-checked="false"]:hover { background: rgba(35, 47, 95, .08); }
 /* Wissel in de quiz */
@@ -689,7 +692,8 @@ function viewHome() {
           <button role="radio" data-snd="1" aria-checked="${soundOn}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h4l5-4v14l-5-4H3z" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg><span>Foto + geluid</span></button>
         </div>
       </div>
-      <button class="primary big" id="start">${due || newAvail ? "Begin met oefenen" : "Extra oefenen"}</button>
+      <div class="startrow"><button class="primary big" id="start">${due || newAvail ? "Begin met oefenen" : "Extra oefenen"}</button>
+      <button class="big mixbtn" id="mix">Husselquiz<span>Alle ${SPECIES.length} soorten door elkaar</span></button></div>
     </section>
     <a class="sod" href="#soort-${sod.id}" style="--lv:${lvColor(sod.level)};text-decoration:none">
       <div class="frame photo"><img src="${photoOf(sod)}" alt="${sod.nl}"></div>
@@ -716,6 +720,7 @@ function viewHome() {
       <p class="small" style="margin-top:14px">Op de Nederlandse lijst staan ruim 500 soorten. De rest zijn dwaalgasten die je hooguit een paar keer in je leven ziet.</p>
     </section>`;
   document.getElementById("start").onclick = () => startSession();
+  document.getElementById("mix").onclick = () => startSession("mix");
   app.querySelectorAll("[data-snd]").forEach(b => b.onclick = () => { soundOn = b.dataset.snd === "1"; store.set("vw:sound:v2", soundOn); viewHome(); });
   app.querySelectorAll("[data-level]").forEach(b => b.onclick = () => startSession(+b.dataset.level));
   app.querySelectorAll("[data-open]").forEach(b => b.onclick = () => {
@@ -729,6 +734,7 @@ let session = null;
 // Langere rondes: herhalingen, tot 4 nieuwe soorten, aangevuld tot 15 vragen
 const qMode = s => modesOf(s).length > 1 && Math.random() < .5 ? "geluid" : "foto";
 function buildQueue(level) {
+  if (level === "mix") return shuffle(SPECIES.filter(s => MEDIA[s.id] && (MEDIA[s.id].p || (soundOn && MEDIA[s.id].s)))).slice(0, 15).map(s => ({ type: "q", id: s.id, mode: qMode(s) }));
   const ROUND = 15, q = [], nq = () => q.filter(x => x.type === "q").length;
   const pool = level ? SPECIES.filter(s => s.level === level) : SPECIES.filter(s => isOpen(s.level));
   if (!level) dueCards().slice(0, 10).forEach(k => { const [id, mode] = k.split(":"); if (byId[id] && isOpen(byId[id].level)) q.push({ type: "q", id, mode }); });
@@ -813,10 +819,10 @@ async function viewQuiz() {
     app.querySelectorAll(".options button").forEach(b => { b.disabled = true; if (b.dataset.id === s.id) b.classList.add("right"); });
     if (!ok && btn.tagName === "BUTTON") btn.classList.add("wrong");
     const prevUnl = unlockedLevel(), prevBox = (progress[cardKey(s.id, mode)] || {}).box || 0;
-    grade(s.id, mode, ok);
+    if (session.level !== "mix" || isSeen(s.id)) grade(s.id, mode, ok);
     session.total++; if (ok) { session.right++; session.streak++; addXp(10 + Math.min(session.streak, 5) * 2, btn); } else session.streak = 0;
     const st = document.querySelector(".streak"); if (st) { st.textContent = session.streak >= 2 ? `${session.streak} op rij` : ""; if (session.streak >= 2) { st.classList.remove("bump"); void st.offsetWidth; st.classList.add("bump"); } }
-    if (ok && prevBox < 2 && progress[cardKey(s.id, mode)].box >= 2) toast(`${s.nl} ${mode === "foto" ? "op zicht" : "op geluid"}: gekend!`);
+    if (ok && prevBox < 2 && ((progress[cardKey(s.id, mode)] || {}).box || 0) >= 2) toast(`${s.nl} ${mode === "foto" ? "op zicht" : "op geluid"}: gekend!`);
     const nowUnl = unlockedLevel(); if (nowUnl > prevUnl) session.levelUp = nowUnl;
     if (!ok && !session.retried.has(cardKey(s.id, mode))) { session.retried.add(cardKey(s.id, mode)); session.queue.splice(Math.min(session.i + 4, session.queue.length), 0, { type: "q", id: s.id, mode }); }
     const chosen = byId[pickedId];
