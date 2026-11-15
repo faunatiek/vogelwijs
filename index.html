@@ -969,10 +969,10 @@ async function viewSoort(id) {
   const stat = m => { const c = p[cardKey(id, m)]; return c ? `${c.right} goed, ${c.wrong} fout` : "nog niet geoefend"; };
   app.innerHTML = `<section class="panel"><a href="#gids" class="small">← Soortengids</a>
     <h1 style="font-size:clamp(2.6rem,12vw,4.5rem)">${s.nl}</h1><p><i>${s.sci}</i> · Niveau ${s.level}: ${LEVELS[s.level - 1].name}</p>
-    <div class="feedback"><strong>Kenmerken</strong><ul>${s.tips.map(t => `<li>${t}</li>`).join("")}</ul></div>
+    <div id="ph" class="small">Foto's laden…</div></section>
+    <section class="panel"><div class="feedback"><strong>Kenmerken</strong><ul>${s.tips.map(t => `<li>${t}</li>`).join("")}</ul></div>
     <p class="small">Jouw score. Zicht: ${stat("foto")}. Geluid: ${stat("geluid")}.</p></section>
     ${kaartHtml(s)}
-    <section class="panel"><h2>Foto's</h2><div id="ph" class="small">Laden…</div></section>
     <section class="panel"><h2>Geluiden</h2><div id="so" class="small">Laden…</div></section>`;
   try {
     const m = await getMedia(s);
