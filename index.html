@@ -106,6 +106,17 @@ button { font: 700 1rem var(--font-body); cursor: pointer; color: var(--ink); ba
 .mleg b { width: 14px; height: 14px; display: inline-block; }
 .lijkt { display: flex; flex-wrap: wrap; gap: 8px; }
 .lijkt a { background: var(--lv); color: var(--ink); padding: 4px 10px; text-decoration: none; font-weight: 700; }
+.card { position: relative; }
+.gzbadge { position: absolute; top: 6px; right: 6px; width: 30px; height: 30px; display: grid; place-items: center; background: var(--ink); color: var(--yellow); font-weight: 900; border-radius: 50%; }
+.card[hidden] { display: none; }
+.gzcount { font-family: var(--font-display); font-weight: 900; font-size: 2rem; }
+.gzlist { margin: 0 0 10px; padding-left: 18px; display: grid; gap: 6px; }
+.gzdel { background: none; border: 0; padding: 2px 6px; box-shadow: none; cursor: pointer; }
+.gzf { display: grid; gap: 10px; margin-bottom: 4px; }
+.gzf label { display: grid; gap: 4px; font-weight: 700; }
+.gzf input { font: 600 1.05rem var(--font-body); color: var(--ink); background: var(--paper); border: 2.5px solid var(--ink); border-radius: 0; padding: 10px 12px; min-width: 0; }
+.backup { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
+.backup p { flex-basis: 100%; margin: 0; }
 button:hover:not(:disabled) { box-shadow: none; transform: none; }
 .mp-opts button[aria-checked="false"]:hover { background: rgba(35, 47, 95, .08); }
 /* Wissel in de quiz */
@@ -912,13 +923,81 @@ function viewDone() {
   session = null;
 }
 
+let gezien = store.get("vw:gezien:v1", {}); // id -> [{d, plek, notitie}]
+const saveGezien = () => store.set("vw:gezien:v1", gezien);
+const isGezien = id => (gezien[id] || []).length > 0;
+const vandaag = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); };
+const datumNL = d => new Date(d + "T12:00").toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" });
+function gezienHtml(s) {
+  const list = (gezien[s.id] || []).slice().sort((a, b) => a.d < b.d ? -1 : 1);
+  return `<section class="panel gezien" id="gz"><h2>${list.length ? "✓ Gezien" : "Al gezien?"}</h2>
+    ${list.length ? `<ul class="gzlist">${list.map(w => `<li><b>${datumNL(w.d)}</b>${w.plek ? ` · ${esc(w.plek)}` : ""}${w.notitie ? `<br><span class="small">${esc(w.notitie)}</span>` : ""} <button class="gzdel small" data-i="${(gezien[s.id] || []).indexOf(w)}" aria-label="Verwijder">✕</button></li>`).join("")}</ul>` : `<p class="small">Heb je deze vogel in het echt gezien? Zet hem op je lijst.</p>`}
+    <div id="gzform" hidden><div class="gzf">
+      <label>Datum<input type="date" id="gzd" value="${vandaag()}" max="${vandaag()}"></label>
+      <label><span>Plek <span class="small">(mag leeg)</span></span><input type="text" id="gzp" maxlength="80" placeholder="Bijv. Oostvaardersplassen"></label>
+      <label><span>Notitie <span class="small">(mag leeg)</span></span><input type="text" id="gzn" maxlength="200" placeholder="Bijv. zingend in het riet"></label>
+      <div><button class="primary" id="gzok">Opslaan</button> <button id="gzcancel">Annuleren</button></div></div></div>
+    <div id="gzbtns"><button class="primary" id="gzadd">${list.length ? "Nog een keer gezien" : "Gezien!"}</button></div></section>`;
+}
+function wireGezien(s) {
+  const root = document.getElementById("gz"); if (!root) return;
+  const redraw = () => { root.outerHTML = gezienHtml(s); wireGezien(s); };
+  root.querySelector("#gzadd").onclick = () => { root.querySelector("#gzform").hidden = false; root.querySelector("#gzbtns").hidden = true; };
+  root.querySelector("#gzcancel").onclick = redraw;
+  root.querySelector("#gzok").onclick = () => {
+    const first = !isGezien(s.id);
+    (gezien[s.id] = gezien[s.id] || []).push({ d: root.querySelector("#gzd").value || vandaag(), plek: root.querySelector("#gzp").value.trim(), notitie: root.querySelector("#gzn").value.trim() });
+    saveGezien(); redraw();
+    if (first) { const n = Object.keys(gezien).filter(isGezien).length; toast(`${s.nl} op je lijst! Nu ${n} ${n === 1 ? "soort" : "soorten"} gezien.`); }
+  };
+  root.querySelectorAll(".gzdel").forEach(b => b.onclick = () => {
+    if (!b.dataset.armed) { b.dataset.armed = 1; b.textContent = "Verwijderen?"; return; }
+    gezien[s.id].splice(+b.dataset.i, 1); if (!gezien[s.id].length) delete gezien[s.id]; saveGezien(); redraw();
+  });
+}
+function backupHtml() {
+  return `<div class="backup"><button id="bkmake">Back-up maken</button> <button id="bkload">Back-up terugzetten</button><input type="file" id="bkfile" accept=".json,application/json" hidden>
+    <p class="small" id="bkmsg">Je lijst en voortgang staan alleen op dit toestel. Met een back-up zet je ze over naar een andere telefoon of browser.</p></div>`;
+}
+function wireBackup() {
+  const mk = document.getElementById("bkmake"); if (!mk) return;
+  const msg = document.getElementById("bkmsg"), file = document.getElementById("bkfile");
+  mk.onclick = () => {
+    const data = { app: "vogelwijs", versie: 1, gemaakt: new Date().toISOString(), data: {} };
+    try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k.startsWith("vw:")) data.data[k] = localStorage.getItem(k); } } catch {}
+    const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `vogelwijs-backup-${vandaag()}.json`;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    msg.textContent = "Back-up gemaakt. Je vindt het bestand bij je downloads.";
+  };
+  document.getElementById("bkload").onclick = () => file.click();
+  file.onchange = async () => {
+    const fl = file.files[0]; if (!fl) return;
+    try {
+      const d = JSON.parse(await fl.text());
+      if (d.app !== "vogelwijs" || !d.data) throw 0;
+      const keys = Object.keys(d.data).filter(k => k.startsWith("vw:"));
+      for (const k of keys) localStorage.setItem(k, d.data[k]);
+      msg.textContent = `Back-up van ${datumNL(d.gemaakt.slice(0, 10))} teruggezet.`;
+      setTimeout(() => location.reload(), 900);
+    } catch { msg.textContent = "Dit bestand is geen Vogelwijs-back-up."; }
+    file.value = "";
+  };
+}
 async function viewGids() {
   setNav("gids");
-  app.innerHTML = LEVELS.map(l => `<section style="display:grid;gap:18px;--lv:${lvColor(l.n)}"><div class="sect-head"><span class="label">Niveau ${String(l.n).padStart(2, "0")} · ${SPECIES.filter(s => s.level === l.n).length} soorten</span><h2>${l.name}</h2></div>
-    <div class="grid">${SPECIES.filter(s => s.level === l.n).map(s => `<a class="card" href="#soort-${s.id}"><div class="thumb" id="th-${s.id}"></div><div class="name"><strong>${s.nl}</strong><i>${s.sci}</i></div></a>`).join("")}</div></section>`).join("");
+  const nGz = SPECIES.filter(s => isGezien(s.id)).length;
+  app.innerHTML = `<section class="panel"><h2>Jouw lijst</h2><p><b class="gzcount">${nGz} van ${SPECIES.length}</b> soorten in het echt gezien</p>
+    <label class="small"><input type="checkbox" id="gzfilter"> Alleen soorten die ik nog niet heb gezien</label>${backupHtml()}</section>` + LEVELS.map(l => `<section style="display:grid;gap:18px;--lv:${lvColor(l.n)}"><div class="sect-head"><span class="label">Niveau ${String(l.n).padStart(2, "0")} · ${SPECIES.filter(s => s.level === l.n).length} soorten · ${SPECIES.filter(s => s.level === l.n && isGezien(s.id)).length} gezien</span><h2>${l.name}</h2></div>
+    <div class="grid">${SPECIES.filter(s => s.level === l.n).map(s => `<a class="card${isGezien(s.id) ? " seen" : ""}" href="#soort-${s.id}"><div class="thumb" id="th-${s.id}"></div>${isGezien(s.id) ? `<span class="gzbadge" aria-label="gezien">✓</span>` : ""}<div class="name"><strong>${s.nl}</strong><i>${s.sci}</i></div></a>`).join("")}</div></section>`).join("");
   for (const s of SPECIES) {
     const el = document.getElementById("th-" + s.id); if (el) el.innerHTML = photoOf(s) ? `<img src="${photoOf(s)}" alt="" loading="lazy">` : `<span class="ava big">${s.nl.replace(/[^A-Za-zÀ-ÿ]/g, "").slice(0, 2)}</span>`;
   }
+  wireBackup();
+  const flt = document.getElementById("gzfilter");
+  flt.checked = store.get("vw:gzfilter:v1", false);
+  const applyF = () => { store.set("vw:gzfilter:v1", flt.checked); app.querySelectorAll(".card.seen").forEach(c => c.hidden = flt.checked); };
+  flt.onchange = applyF; applyF();
 }
 const MAAND = "JFMAMJJASOND";
 const SEIZ = { J: "jaarrond", Z: "broedtijd", T: "doortrek", W: "winter", "-": "zelden of niet" };
@@ -970,10 +1049,12 @@ async function viewSoort(id) {
   app.innerHTML = `<section class="panel"><a href="#gids" class="small">← Soortengids</a>
     <h1 style="font-size:clamp(2.6rem,12vw,4.5rem)">${s.nl}</h1><p><i>${s.sci}</i> · Niveau ${s.level}: ${LEVELS[s.level - 1].name}</p>
     <div id="ph" class="small">Foto's laden…</div></section>
+    ${gezienHtml(s)}
     <section class="panel"><div class="feedback"><strong>Kenmerken</strong><ul>${s.tips.map(t => `<li>${t}</li>`).join("")}</ul></div>
     <p class="small">Jouw score. Zicht: ${stat("foto")}. Geluid: ${stat("geluid")}.</p></section>
     ${kaartHtml(s)}
     <section class="panel"><h2>Geluiden</h2><div id="so" class="small">Laden…</div></section>`;
+  wireGezien(s);
   try {
     const m = await getMedia(s);
     document.getElementById("ph").outerHTML = m.photos.length ? `<div id="phs">${swipeHtml(m.photos, s.nl)}</div>` : `<p class="small">Geen foto's gevonden.</p>`;
@@ -991,8 +1072,9 @@ function viewOver() {
     <p>Een gratis site met ${SPECIES.length} algemene Nederlandse soorten in ${LEVELS.length} niveaus.</p>
     <p>Foto's en geluiden komen van iNaturalist, gemaakt door vrijwilligers en gedeeld onder een Creative Commons-licentie. Bij elke foto en opname staat wie hem maakte.</p>
     <p>Bijna elke soort heeft een echte opname: steeds de duidelijkste vijf seconden. Een paar stille soorten oefen je alleen op foto's.</p>
-    <p>Je voortgang wordt alleen in deze browser bewaard.</p>
+    <p>Je voortgang en je lijst van geziene vogels worden alleen in deze browser bewaard.</p>${backupHtml()}
     <div><button id="reset">Voortgang wissen</button> <span id="resetmsg" class="small"></span></div></section>`;
+  wireBackup();
   let armed = false;
   document.getElementById("reset").onclick = e => {
     if (!armed) { armed = true; e.target.textContent = "Klik nogmaals om te wissen"; return; }
