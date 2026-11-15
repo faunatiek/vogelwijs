@@ -720,7 +720,8 @@ function viewHome() {
         </div>
       </div>
       <div class="startrow"><button class="primary big" id="start">${due || newAvail ? "Begin met oefenen" : "Extra oefenen"}</button>
-      <button class="big mixbtn" id="mix">Husselquiz<span>Alle ${SPECIES.length} soorten door elkaar</span></button></div>
+      <button class="big mixbtn" id="mix">Husselquiz<span>Alle ${SPECIES.length} soorten door elkaar</span></button>
+      <button class="big mixbtn" id="seenq" ${SPECIES.filter(s => isSeen(s.id)).length < 4 ? "disabled" : ""}>Mijn vogels<span>${SPECIES.filter(s => isSeen(s.id)).length < 4 ? "Leer eerst een paar soorten in het leerpad" : `Alle ${SPECIES.filter(s => isSeen(s.id)).length} soorten die je al hebt geleerd`}</span></button></div>
     </section>
     <a class="sod" href="#soort-${sod.id}" style="--lv:${lvColor(sod.level)};text-decoration:none">
       <div class="frame photo"><img src="${photoOf(sod)}" alt="${sod.nl}"></div>
@@ -749,6 +750,7 @@ function viewHome() {
     </section>`;
   document.getElementById("start").onclick = () => startSession();
   document.getElementById("mix").onclick = () => startSession("mix");
+  document.getElementById("seenq").onclick = () => startSession("seen");
   document.getElementById("earlier").onchange = e => { withEarlier = e.target.checked; store.set("vw:earlier:v1", withEarlier); };
   app.querySelectorAll("[data-snd]").forEach(b => b.onclick = () => { soundOn = b.dataset.snd === "1"; store.set("vw:sound:v2", soundOn); viewHome(); });
   app.querySelectorAll("[data-level]").forEach(b => b.onclick = () => startSession(+b.dataset.level));
@@ -765,6 +767,7 @@ const inLevel = (s, level) => withEarlier ? s.level <= level && isOpen(s.level) 
 // Langere rondes: herhalingen, tot 4 nieuwe soorten, aangevuld tot 15 vragen
 const qMode = s => modesOf(s).length > 1 && Math.random() < .5 ? "geluid" : "foto";
 function buildQueue(level) {
+  if (level === "seen") return shuffle(SPECIES.filter(s => isSeen(s.id) && MEDIA[s.id] && (MEDIA[s.id].p || (soundOn && MEDIA[s.id].s)))).map(s => ({ type: "q", id: s.id, mode: qMode(s) }));
   if (level === "mix") return shuffle(SPECIES.filter(s => MEDIA[s.id] && (MEDIA[s.id].p || (soundOn && MEDIA[s.id].s)))).slice(0, 15).map(s => ({ type: "q", id: s.id, mode: qMode(s) }));
   const ROUND = 15, q = [], nq = () => q.filter(x => x.type === "q").length;
   const pool = level ? SPECIES.filter(s => s.level === level) : SPECIES.filter(s => isOpen(s.level));
@@ -803,7 +806,8 @@ app.addEventListener("click", e => {
 const qsndHtml = () => `<button class="qsnd" id="qsnd" aria-pressed="${soundOn}" aria-label="${soundOn ? "Geluid staat aan, tik voor alleen foto's" : "Alleen foto's, tik om geluid aan te zetten"}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h4l5-4v14l-5-4H3z" fill="currentColor"/>${soundOn ? '<path d="M15.5 8.5a5 5 0 0 1 0 7M18 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round"/>' : '<path d="M15.5 9.5l5 5M20.5 9.5l-5 5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>'}</svg>${soundOn ? "Aan" : "Uit"}</button>`;
 function distractors(s) {
   const lv = session && typeof session.level === "number" ? session.level : 0;
-  const pool = SPECIES.filter(x => x.id !== s.id && (lv ? inLevel(x, lv) || x.level === s.level : isOpen(x.level) || x.level === s.level));
+  const learned = SPECIES.filter(x => x.id !== s.id && isSeen(x.id));
+  const pool = session && session.level === "seen" && learned.length >= 3 ? learned : SPECIES.filter(x => x.id !== s.id && (lv ? inLevel(x, lv) || x.level === s.level : isOpen(x.level) || x.level === s.level));
   const same = shuffle(pool.filter(x => x.level === s.level)), other = shuffle(pool.filter(x => x.level !== s.level));
   return [...same, ...other].slice(0, 3);
 }
