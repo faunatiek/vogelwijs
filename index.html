@@ -108,7 +108,7 @@ button { font: 700 1rem var(--font-body); cursor: pointer; color: var(--ink); ba
 .lijkt a { background: var(--lv); color: var(--ink); padding: 4px 10px; text-decoration: none; font-weight: 700; }
 .card { position: relative; }
 .gzbadge { position: absolute; top: 6px; right: 6px; width: 30px; height: 30px; display: grid; place-items: center; background: var(--ink); color: var(--yellow); font-weight: 900; border-radius: 50%; }
-.card[hidden] { display: none; }
+.card[hidden], .leeg[hidden] { display: none; }
 .gzcount { font-family: var(--font-display); font-weight: 900; font-size: 2rem; }
 .gzlist { margin: 0 0 10px; padding-left: 18px; display: grid; gap: 6px; }
 .gzdel { background: none; border: 0; padding: 2px 6px; box-shadow: none; cursor: pointer; }
@@ -117,6 +117,44 @@ button { font: 700 1rem var(--font-body); cursor: pointer; color: var(--ink); ba
 .gzf input { font: 600 1.05rem var(--font-body); color: var(--ink); background: var(--paper); border: 2.5px solid var(--ink); border-radius: 0; padding: 10px 12px; min-width: 0; }
 .backup { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
 .backup p { flex-basis: 100%; margin: 0; }
+.letop { background: color-mix(in srgb, var(--orange) 35%, var(--paper)); border-left: 6px solid var(--orange); padding: 12px 14px; margin: 0; }
+.letoprow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center; }
+.btnlink { font-weight: 700; color: var(--ink); padding: 10px 14px; border: 2.5px solid var(--ink); text-decoration: none; background: var(--paper); }
+.play { display: grid; gap: 12px; }
+.play-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 10px; }
+.play-head .mp-opts { min-width: 230px; }
+.play-head .mp-opts button { flex-direction: row; padding: 9px 12px; font-size: 1rem; gap: 8px; justify-content: center; }
+.play-head .mp-opts button svg { width: 22px; height: 22px; }
+.tile { position: relative; display: grid; gap: 4px; text-align: left; align-content: start; padding: 16px 16px 18px; border: 2.5px solid var(--ink); color: var(--ink); text-transform: none; letter-spacing: 0; box-shadow: 5px 5px 0 var(--ink); transition: transform .12s, box-shadow .12s; }
+.tile:active { transform: translate(3px, 3px); box-shadow: 2px 2px 0 var(--ink); }
+.tile .tk { font-family: var(--font-display); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; font-size: .85rem; opacity: .8; }
+.tile strong { font-family: var(--font-display); font-weight: 900; text-transform: uppercase; font-size: 1.9rem; line-height: .95; }
+.tile .ts { font-family: var(--font-body); font-weight: 600; font-size: .88rem; }
+.tile .tn { font-family: var(--font-display); font-weight: 900; font-size: 3.2rem; line-height: 1; margin-top: 6px; }
+.tile-main { background: var(--ink); color: var(--yellow); padding-right: 64px; }
+.tile-main strong { font-size: 2.3rem; }
+.tile-main .ts { color: var(--paper); }
+.tile-main .arrow { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); font-size: 2.4rem; font-weight: 900; }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.tile-mix { background: var(--pink); }
+.tile-mine { background: var(--teal); }
+.tile:disabled { background: color-mix(in srgb, var(--ink) 8%, var(--paper)); box-shadow: none; opacity: 1; }
+.tile:disabled .tn, .tile:disabled strong { opacity: .45; }
+.seg { display: flex; border: 2.5px solid var(--ink); background: var(--paper); margin: 4px 0 10px; }
+.seg button { flex: 1; border: 0; padding: 10px 6px; background: transparent; font-family: var(--font-display); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; font-size: 1rem; line-height: 1.05; box-shadow: none; }
+.seg button + button { border-left: 2.5px solid var(--ink); }
+.seg button[aria-checked="true"] { background: var(--ink); color: var(--paper); }
+.gidsbar { display: flex; gap: 8px; flex-wrap: wrap; }
+.gidsbar button { padding: 6px 10px; }
+details.bk { margin-top: 12px; }
+details.bk summary { cursor: pointer; font-weight: 700; }
+.lvgroup { display: grid; gap: 18px; }
+.lvgroup > summary { list-style: none; cursor: pointer; }
+.lvgroup > summary::-webkit-details-marker { display: none; }
+.lvgroup h2 { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.chev { width: 16px; height: 16px; border-right: 4px solid var(--ink); border-bottom: 4px solid var(--ink); transform: rotate(45deg); margin: -8px 6px 0 0; transition: transform .15s; flex: none; }
+.lvgroup:not([open]) .chev { transform: rotate(-45deg); margin-top: 0; }
+.lvgroup + .lvgroup { margin-top: 14px; }
 button:hover:not(:disabled) { box-shadow: none; transform: none; }
 .mp-opts button[aria-checked="false"]:hover { background: rgba(35, 47, 95, .08); }
 /* Wissel in de quiz */
@@ -697,6 +735,7 @@ function viewHome() {
   const due = dueCards().length;
   const knownAll = Object.values(progress).filter(c => c.box >= 2).length;
   const newAvail = SPECIES.filter(s => isOpen(s.level) && !isSeen(s.id)).length;
+  const nSeen = SPECIES.filter(s => isSeen(s.id)).length;
   const l1 = SPECIES.filter(s => LOOK[s.id] && s.level === 1), hero = l1[Math.floor(Date.now() / DAY + 3) % l1.length];
   const drawn = SPECIES.filter(s => LOOK[s.id]), dayIdx = Math.floor(Date.now() / DAY) % drawn.length, sod = drawn[dayIdx];
   app.innerHTML = `
@@ -712,17 +751,20 @@ function viewHome() {
         <div><b>${knownAll}</b><span>gekend</span></div>
         <div><b>${liveDays()}</b><span>dagen op rij</span></div>
       </div>
-      <div class="modepick" role="radiogroup" aria-label="Waarmee wil je oefenen?">
-        <span class="mp-label">Waarmee oefen je?</span>
-        <div class="mp-opts">
+    </section>
+    <section class="play" aria-label="Oefenen">
+      <div class="play-head"><h2>Oefenen</h2>
+        <div class="modepick" role="radiogroup" aria-label="Waarmee wil je oefenen?"><div class="mp-opts">
           <button role="radio" data-snd="0" aria-checked="${!soundOn}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="1.5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="9" cy="10" r="1.8" fill="currentColor"/><path d="M4 18l5-5 3 3 3-4 5 6" fill="currentColor"/></svg><span>Alleen foto's</span></button>
           <button role="radio" data-snd="1" aria-checked="${soundOn}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h4l5-4v14l-5-4H3z" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg><span>Foto + geluid</span></button>
-        </div>
+        </div></div></div>
+      <button class="tile tile-main" id="start"><span class="tk">Quiz · leerpad</span><strong>${due || newAvail ? "Verder met leren" : "Extra oefenen"}</strong><span class="ts">${due || newAvail ? `${due} te herhalen · ${Math.min(3, newAvail)} nieuwe soorten` : "Alles is bij, oefen gewoon door"}</span><span class="arrow" aria-hidden="true">→</span></button>
+      <div class="tiles">
+        <button class="tile tile-mix" id="mix"><span class="tk">Quiz</span><strong>Hussel&shy;quiz</strong><b class="tn">${SPECIES.length}</b><span class="ts">soorten door elkaar</span></button>
+        <button class="tile tile-mine" id="seenq" ${nSeen < 4 ? "disabled" : ""}><span class="tk">Quiz</span><strong>Mijn vogels</strong><b class="tn">${nSeen}</b><span class="ts">${nSeen < 4 ? "leer er eerst 4 in het leerpad" : "soorten die je al hebt geleerd"}</span></button>
       </div>
-      <div class="startrow"><button class="primary big" id="start">${due || newAvail ? "Begin met oefenen" : "Extra oefenen"}</button>
-      <button class="big mixbtn" id="mix">Husselquiz<span>Alle ${SPECIES.length} soorten door elkaar</span></button>
-      <button class="big mixbtn" id="seenq" ${SPECIES.filter(s => isSeen(s.id)).length < 4 ? "disabled" : ""}>Mijn vogels<span>${SPECIES.filter(s => isSeen(s.id)).length < 4 ? "Leer eerst een paar soorten in het leerpad" : `Alle ${SPECIES.filter(s => isSeen(s.id)).length} soorten die je al hebt geleerd`}</span></button></div>
     </section>
+    ${Object.keys(progress).length && Date.now() > store.get("vw:letop:v1", 0) ? `<section class="letop" id="letop"><b>Let op:</b> je voortgang staat alleen in deze browser. Wis je je browsergeschiedenis, dan ben je alles kwijt. <div class="letoprow"><a class="btnlink" href="#gids">Back-up maken</a> <button id="letopok">Begrepen</button></div></section>` : ""}
     <a class="sod" href="#soort-${sod.id}" style="--lv:${lvColor(sod.level)};text-decoration:none">
       <div class="frame photo"><img src="${photoOf(sod)}" alt="${sod.nl}"></div>
       <div><span class="label">Soort van de dag</span><h3>${sod.nl}</h3><p><i>${sod.sci}</i> · ${sod.tips[0]}</p></div>
@@ -750,6 +792,7 @@ function viewHome() {
     </section>`;
   document.getElementById("start").onclick = () => startSession();
   document.getElementById("mix").onclick = () => startSession("mix");
+  const lo = document.getElementById("letopok"); if (lo) lo.onclick = () => { store.set("vw:letop:v1", Date.now() + 14 * DAY); document.getElementById("letop").remove(); };
   document.getElementById("seenq").onclick = () => startSession("seen");
   document.getElementById("earlier").onchange = e => { withEarlier = e.target.checked; store.set("vw:earlier:v1", withEarlier); };
   app.querySelectorAll("[data-snd]").forEach(b => b.onclick = () => { soundOn = b.dataset.snd === "1"; store.set("vw:sound:v2", soundOn); viewHome(); });
@@ -941,6 +984,7 @@ function gezienHtml(s) {
       <label><span>Plek <span class="small">(mag leeg)</span></span><input type="text" id="gzp" maxlength="80" placeholder="Bijv. Oostvaardersplassen"></label>
       <label><span>Notitie <span class="small">(mag leeg)</span></span><input type="text" id="gzn" maxlength="200" placeholder="Bijv. zingend in het riet"></label>
       <div><button class="primary" id="gzok">Opslaan</button> <button id="gzcancel">Annuleren</button></div></div></div>
+    ${list.length ? `<p class="small">Je lijst staat alleen in deze browser. <a href="#gids">Maak een back-up</a> zodat je hem niet kwijtraakt.</p>` : ""}
     <div id="gzbtns"><button class="primary" id="gzadd">${list.length ? "Nog een keer gezien" : "Gezien!"}</button></div></section>`;
 }
 function wireGezien(s) {
@@ -959,9 +1003,10 @@ function wireGezien(s) {
     gezien[s.id].splice(+b.dataset.i, 1); if (!gezien[s.id].length) delete gezien[s.id]; saveGezien(); redraw();
   });
 }
+const LETOP = `<p class="letop"><b>Let op:</b> je voortgang en je lijst staan alleen in deze browser. Wis je je browsergeschiedenis of websitegegevens, dan ben je alles kwijt. Maak daarom af en toe een back-up.</p>`;
 function backupHtml() {
-  return `<div class="backup"><button id="bkmake">Back-up maken</button> <button id="bkload">Back-up terugzetten</button><input type="file" id="bkfile" accept=".json,application/json" hidden>
-    <p class="small" id="bkmsg">Je lijst en voortgang staan alleen op dit toestel. Met een back-up zet je ze over naar een andere telefoon of browser.</p></div>`;
+  return `${LETOP}<div class="backup"><button id="bkmake">Back-up maken</button> <button id="bkload">Back-up terugzetten</button><input type="file" id="bkfile" accept=".json,application/json" hidden>
+    <p class="small" id="bkmsg">Met een back-up zet je alles ook over naar een andere telefoon of browser.</p></div>`;
 }
 function wireBackup() {
   const mk = document.getElementById("bkmake"); if (!mk) return;
@@ -991,17 +1036,34 @@ function wireBackup() {
 async function viewGids() {
   setNav("gids");
   const nGz = SPECIES.filter(s => isGezien(s.id)).length;
+  const dicht = new Set(store.get("vw:gidsdicht:v1", []));
+  let flt = store.get("vw:gzfilter:v2", "alle");
+  const lvList = l => SPECIES.filter(s => s.level === l.n);
   app.innerHTML = `<section class="panel"><h2>Jouw lijst</h2><p><b class="gzcount">${nGz} van ${SPECIES.length}</b> soorten in het echt gezien</p>
-    <label class="small"><input type="checkbox" id="gzfilter"> Alleen soorten die ik nog niet heb gezien</label>${backupHtml()}</section>` + LEVELS.map(l => `<section style="display:grid;gap:18px;--lv:${lvColor(l.n)}"><div class="sect-head"><span class="label">Niveau ${String(l.n).padStart(2, "0")} · ${SPECIES.filter(s => s.level === l.n).length} soorten · ${SPECIES.filter(s => s.level === l.n && isGezien(s.id)).length} gezien</span><h2>${l.name}</h2></div>
-    <div class="grid">${SPECIES.filter(s => s.level === l.n).map(s => `<a class="card${isGezien(s.id) ? " seen" : ""}" href="#soort-${s.id}"><div class="thumb" id="th-${s.id}"></div>${isGezien(s.id) ? `<span class="gzbadge" aria-label="gezien">✓</span>` : ""}<div class="name"><strong>${s.nl}</strong><i>${s.sci}</i></div></a>`).join("")}</div></section>`).join("");
+    <div class="seg" role="radiogroup" aria-label="Toon">${[["alle", "Alle"], ["gezien", "Gezien"], ["niet", "Nog niet gezien"]].map(([k, t]) => `<button role="radio" data-f="${k}" aria-checked="${flt === k}">${t}</button>`).join("")}</div>
+    <div class="gidsbar"><button id="allopen" class="small">Alles uitklappen</button> <button id="alldicht" class="small">Alles inklappen</button></div>
+    <details class="bk"><summary>Back-up maken of terugzetten</summary>${backupHtml()}</details></section>` +
+    LEVELS.map(l => `<details class="lvgroup" data-n="${l.n}" style="--lv:${lvColor(l.n)}"${dicht.has(l.n) ? "" : " open"}><summary class="sect-head"><span class="label">Niveau ${String(l.n).padStart(2, "0")} · ${lvList(l).length} soorten · ${lvList(l).filter(s => isGezien(s.id)).length} gezien</span><h2>${l.name}<span class="chev" aria-hidden="true"></span></h2></summary>
+    <div class="grid">${lvList(l).map(s => `<a class="card${isGezien(s.id) ? " seen" : ""}" href="#soort-${s.id}"><div class="thumb" id="th-${s.id}"></div>${isGezien(s.id) ? `<span class="gzbadge" aria-label="gezien">✓</span>` : ""}<div class="name"><strong>${s.nl}</strong><i>${s.sci}</i></div></a>`).join("")}</div><p class="small leeg" hidden>Geen soorten in deze selectie.</p></details>`).join("");
   for (const s of SPECIES) {
     const el = document.getElementById("th-" + s.id); if (el) el.innerHTML = photoOf(s) ? `<img src="${photoOf(s)}" alt="" loading="lazy">` : `<span class="ava big">${s.nl.replace(/[^A-Za-zÀ-ÿ]/g, "").slice(0, 2)}</span>`;
   }
   wireBackup();
-  const flt = document.getElementById("gzfilter");
-  flt.checked = store.get("vw:gzfilter:v1", false);
-  const applyF = () => { store.set("vw:gzfilter:v1", flt.checked); app.querySelectorAll(".card.seen").forEach(c => c.hidden = flt.checked); };
-  flt.onchange = applyF; applyF();
+  const applyF = () => {
+    store.set("vw:gzfilter:v2", flt);
+    app.querySelectorAll("[data-f]").forEach(b => b.setAttribute("aria-checked", b.dataset.f === flt));
+    app.querySelectorAll(".lvgroup").forEach(g => {
+      let n = 0;
+      g.querySelectorAll(".card").forEach(c => { const seen = c.classList.contains("seen"); c.hidden = flt === "gezien" ? !seen : flt === "niet" ? seen : false; if (!c.hidden) n++; });
+      g.querySelector(".leeg").hidden = n > 0;
+    });
+  };
+  app.querySelectorAll("[data-f]").forEach(b => b.onclick = () => { flt = b.dataset.f; applyF(); });
+  applyF();
+  const saveDicht = () => store.set("vw:gidsdicht:v1", [...app.querySelectorAll(".lvgroup:not([open])")].map(g => +g.dataset.n));
+  app.querySelectorAll(".lvgroup").forEach(g => g.addEventListener("toggle", saveDicht));
+  document.getElementById("allopen").onclick = () => app.querySelectorAll(".lvgroup").forEach(g => g.open = true);
+  document.getElementById("alldicht").onclick = () => app.querySelectorAll(".lvgroup").forEach(g => g.open = false);
 }
 const MAAND = "JFMAMJJASOND";
 const SEIZ = { J: "jaarrond", Z: "broedtijd", T: "doortrek", W: "winter", "-": "zelden of niet" };
